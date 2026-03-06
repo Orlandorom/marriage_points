@@ -6,10 +6,10 @@ class SummaryCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TaskService _taskService = TaskService();
+    final TaskService taskService = TaskService();
 
     return FutureBuilder<Map<String, dynamic>>(
-      future: _taskService.getCoupleStatus(),
+      future: taskService.getCoupleStatus(),
       builder: (context, snapshot) {
         // 1. Estado de carga
         if (snapshot.connectionState == ConnectionState.waiting) {

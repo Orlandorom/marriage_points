@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Mantener esto
 
-void main() {
+void main() async {
+  // 1. Esto es obligatorio cuando usas async en el main
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Cargamos los datos de idioma (español en este caso)
+  // Sin esto, DateFormat('...', 'es') genera el error que ves
+  await initializeDateFormatting('es', null);
+
   runApp(const MarriagePointsApp());
 }
 
@@ -14,7 +22,10 @@ class MarriagePointsApp extends StatelessWidget {
       title: 'Marriage Points',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.pink, // Un color acorde a la temática
+        // Un rosa/fucsia que combine con tu diseño de 173, 30, 59
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color.fromARGB(255, 173, 30, 59),
+        ),
         useMaterial3: true,
       ),
       home: const LoginScreen(),

@@ -157,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   return Padding(
     padding: const EdgeInsets.only(bottom: 15),
     child: DropdownButtonFormField<String>(
-      value: val,
+      initialValue: val,
       // IMPORTANTE: Si la lista está vacía, mostramos un ítem temporal de "Cargando..."
       items: items.isEmpty 
         ? [const DropdownMenuItem(value: null, child: Text("Cargando opciones..."))]

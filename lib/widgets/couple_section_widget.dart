@@ -93,7 +93,7 @@ class _CoupleSectionWidgetState extends State<CoupleSectionWidget> {
   // --- MÉTODOS DE VINCULACIÓN ---
 
   void _showLinkingModal(BuildContext context) {
-    final TextEditingController _codeController = TextEditingController();
+    final TextEditingController codeController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -139,7 +139,7 @@ class _CoupleSectionWidgetState extends State<CoupleSectionWidget> {
             const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Text("O")),
 
             TextField(
-              controller: _codeController,
+              controller: codeController,
               textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
                 hintText: "Pega el código de tu pareja",
@@ -153,7 +153,7 @@ class _CoupleSectionWidgetState extends State<CoupleSectionWidget> {
 
             ElevatedButton(
               onPressed: () async {
-                if (_codeController.text.trim().isEmpty) return;
+                if (codeController.text.trim().isEmpty) return;
 
                 showDialog(
                   context: context,
@@ -161,7 +161,7 @@ class _CoupleSectionWidgetState extends State<CoupleSectionWidget> {
                   builder: (context) => const Center(child: CircularProgressIndicator()),
                 );
 
-                bool success = await _taskService.linkWithPartner(_codeController.text.trim());
+                bool success = await _taskService.linkWithPartner(codeController.text.trim());
                 
                 if (mounted) Navigator.pop(context); // Quitar loading
 
@@ -176,13 +176,13 @@ class _CoupleSectionWidgetState extends State<CoupleSectionWidget> {
                   }
                 }
               },
-              child: const Text("Vincular pareja"),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: const Color(0xFFB85C6E),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
+              child: const Text("Vincular pareja"),
             ),
           ],
         ),
