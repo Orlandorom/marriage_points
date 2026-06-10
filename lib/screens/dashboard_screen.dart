@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
+import '../models/task_model.dart';
+import '../services/task_service.dart';
 import '../widgets/couple_section_widget.dart';
 import '../widgets/summary_card_widget.dart';
-import '../services/task_service.dart';
-import '../widgets/task_summary_card.dart';
 import 'pending_tasks_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -24,15 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  // --- LÓGICA DE NAVEGACIÓN Y MODALES ---
-
-  void _showCreateTaskModal(BuildContext context, {String? targetUserId, String? initialTitle}) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
+  void _showPlanifyModal(BuildContext context, TaskModel deseo) async {
+    showDialog(context: context, builder: (context) => const Center(child: CircularProgressIndicator()));
     final statusData = await _taskService.getCoupleStatus();
     if (!mounted) return;
     Navigator.pop(context);
@@ -45,8 +36,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         myId: statusData['me']?['id'] ?? '',
         partnerId: statusData['partner']?['id'] ?? '',
         partnerName: statusData['partner']?['name'] ?? "Pareja",
-        initialTitle: initialTitle,
-        preSelectedUserId: targetUserId,
+        initialTitle: "Meta: ${deseo.title}",
+        // ASIGNACIÓN: Se le asigna a quien pidió el deseo para que lo cumpla
+        preSelectedUserId: deseo.createdByUserId, 
         onTaskCreated: _refreshAll,
       ),
     );
@@ -67,62 +59,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: const Color(0xFFFBF7F8),
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 173, 30, 59),
-        elevation: 0,
         title: const Text("Nuestro Hogar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: () => _showLogoutDialog(context),
+            onPressed: () => Navigator.pushReplacementNamed(context, '/'),
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => _refreshAll(),
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           child: Column(
             key: _refreshKey,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Identidad de pareja
               CoupleSectionWidget(onRefreshNeeded: _refreshAll),
               const SizedBox(height: 25),
-
-              // 2. LO QUE MI PAREJA SUEÑA (Deseos/Requests)
-              const Text("LO QUE MI PAREJA SUEÑA", 
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+              const Text("DESEOS DE MI PAREJA", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 10),
-              _PartnerWishesSection(
-                onPlanify: (wishTitle, partnerId) => _showCreateTaskModal(
-                  context, 
-                  targetUserId: partnerId, 
-                  initialTitle: "Meta: $wishTitle"
-                ),
-              ),
-              
+              _PartnerWishesSection(onPlanify: (deseo) => _showPlanifyModal(context, deseo)),
               const SizedBox(height: 30),
-
-              // 3. Progreso y Puntos
-              const SummaryCardWidget(), 
-              const SizedBox(height: 20),
               
+              // WIDGET DE OBJETIVOS AJUSTADO
               FutureBuilder<Map<String, dynamic>>(
                 future: _taskService.getSummary(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return TaskSummaryCard(
-                    summary: snapshot.data ?? {},
-                    onCreatePressed: () => _showCreateTaskModal(context),
-                  );
+                  if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
+                  return _TaskSummaryCard(summary: snapshot.data ?? {});
                 },
               ),
-              
-              const SizedBox(height: 30),
 
-              // 4. Botones de Acción
+              const SizedBox(height: 30),
               Row(
                 children: [
                   Expanded(
@@ -152,104 +121,125 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+}
 
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("¿Cerrar sesión?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("No")),
-          TextButton(onPressed: () => Navigator.pushReplacementNamed(context, '/'), child: const Text("Sí")),
+// --- WIDGET DE OBJETIVOS (TASK SUMMARY) ---
+class _TaskSummaryCard extends StatelessWidget {
+  final Map<String, dynamic> summary;
+  const _TaskSummaryCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final int total = summary['totalTasks'] ?? 0;
+    final int completed = summary['completedTasks'] ?? 0;
+    final int pending = total - completed;
+    final int totalPoints = summary['totalPoints'] ?? 0;
+    final int completedPoints = summary['completedPoints'] ?? 0;
+    final int pendingPoints = totalPoints - completedPoints;
+    double progress = total > 0 ? completed / total : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("MIS OBJETIVOS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StatItem(label: "Pendientes", value: "$pending / $total"),
+              _StatItem(label: "Puntos faltantes", value: "$pendingPoints pts"),
+            ],
+          ),
+          const SizedBox(height: 20),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.grey.shade100,
+            color: const Color(0xFFB85C6E),
+            minHeight: 10,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          const SizedBox(height: 10),
+          Text("${(progress * 100).toInt()}% completado", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 }
 
-// --- SECCIÓN DE DESEOS (Partner Requests) ---
+class _StatItem extends StatelessWidget {
+  final String label, value;
+  const _StatItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ],
+    );
+  }
+}
+
+// --- RESTO DE WIDGETS AUXILIARES ---
 
 class _PartnerWishesSection extends StatelessWidget {
-  final Function(String, String) onPlanify;
+  final Function(TaskModel) onPlanify;
   const _PartnerWishesSection({required this.onPlanify});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List<TaskModel>>(
       future: TaskService().getPartnerRequests(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-            child: const Text("Sin deseos pendientes de tu pareja ✨", style: TextStyle(color: Colors.grey)),
-          );
-        }
-
-        return SizedBox(
-          height: 150,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              final wish = snapshot.data![index];
-              return Container(
-                width: 260,
-                margin: const EdgeInsets.only(right: 15),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF1A1A1D), Color(0xFF3C3C3F)]),
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(wish.title.toString().replaceAll("PEDIDO: ", ""), 
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: () => onPlanify(wish.title, wish.createdByUserId.toString()),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-                      child: const Text("ASIGNAR TAREAS", style: TextStyle(fontSize: 11)),
-                    )
-                  ],
-                ),
-              );
-            },
-          ),
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        final deseos = snapshot.data ?? [];
+        if (deseos.isEmpty) return const Text("No hay deseos pendientes ✨", style: TextStyle(color: Colors.grey));
+        return Column(
+          children: deseos.map((deseo) => Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: ListTile(
+              title: Text(deseo.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(deseo.description ?? ""),
+              trailing: ElevatedButton(
+                onPressed: () => onPlanify(deseo),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB85C6E)),
+                child: const Text("Planificar", style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          )).toList(),
         );
       },
     );
   }
 }
 
-// --- WIDGETS DE SOPORTE ---
-
 class _MenuButton extends StatelessWidget {
   final String title, subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-
   const _MenuButton({required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(25),
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(25)),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(height: 12),
+            Icon(icon, color: Colors.white),
+            const SizedBox(height: 10),
             Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 10)),
           ],
         ),
       ),
@@ -257,39 +247,33 @@ class _MenuButton extends StatelessWidget {
   }
 }
 
-// --- FORMULARIO DE DESEOS ---
 class _CreateRequestForm extends StatefulWidget {
   final VoidCallback onCreated;
   const _CreateRequestForm({required this.onCreated});
-
   @override
   State<_CreateRequestForm> createState() => _CreateRequestFormState();
 }
 
 class _CreateRequestFormState extends State<_CreateRequestForm> {
   final _controller = TextEditingController();
-  bool _loading = false;
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, top: 25, left: 25, right: 25),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text("¿Qué deseas pedir?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          TextField(controller: _controller, decoration: const InputDecoration(hintText: "Ej: Cena romántica")),
+          const Text("¿Qué deseas pedir?", style: TextStyle(fontWeight: FontWeight.bold)),
+          TextField(controller: _controller, decoration: const InputDecoration(hintText: "Ej: Viaje a la playa")),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _loading ? null : () async {
-              setState(() => _loading = true);
-              final ok = await TaskService().createGoalRequest(_controller.text, DateTime.now());
-              if (ok) { widget.onCreated(); Navigator.pop(context); }
-              setState(() => _loading = false);
+            onPressed: () async {
+              await TaskService().createGoalRequest(_controller.text, DateTime.now());
+              widget.onCreated();
+              Navigator.pop(context);
             },
-            child: _loading ? const CircularProgressIndicator() : const Text("ENVIAR DESEO"),
+            child: const Text("Enviar deseo"),
           )
         ],
       ),
@@ -297,17 +281,11 @@ class _CreateRequestFormState extends State<_CreateRequestForm> {
   }
 }
 
-// --- FORMULARIO DE TAREAS (Adaptado para validación de deseos) ---
 class _CreateTaskForm extends StatefulWidget {
   final String myId, partnerId, partnerName;
   final String? initialTitle, preSelectedUserId;
   final VoidCallback onTaskCreated;
-
-  const _CreateTaskForm({
-    required this.myId, required this.partnerId, required this.partnerName, 
-    this.initialTitle, this.preSelectedUserId, required this.onTaskCreated
-  });
-
+  const _CreateTaskForm({required this.myId, required this.partnerId, required this.partnerName, this.initialTitle, this.preSelectedUserId, required this.onTaskCreated});
   @override
   State<_CreateTaskForm> createState() => _CreateTaskFormState();
 }
@@ -315,39 +293,37 @@ class _CreateTaskForm extends StatefulWidget {
 class _CreateTaskFormState extends State<_CreateTaskForm> {
   late TextEditingController _titleController;
   final _pointsController = TextEditingController(text: "10");
-  String? _assignedToId;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initialTitle);
-    _assignedToId = widget.preSelectedUserId ?? widget.partnerId;
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, top: 25, left: 25, right: 25),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(widget.initialTitle != null ? "Planificar Meta" : "Nueva Tarea", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Tarea específica")),
+          const Text("Planificar Meta para mi Pareja", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Tarea")),
           TextField(controller: _pointsController, decoration: const InputDecoration(labelText: "Puntos"), keyboardType: TextInputType.number),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () async {
               await TaskService().createTask({
                 "title": _titleController.text,
-                "points": int.tryParse(_pointsController.text) ?? 0,
-                "assignedToUserId": _assignedToId,
+                "points": int.parse(_pointsController.text),
+                "assignedToUserId": widget.preSelectedUserId,
               });
               widget.onTaskCreated();
               Navigator.pop(context);
             },
-            child: const Text("ASIGNAR TAREA"),
+            child: const Text("Asignar Tarea"),
           )
         ],
       ),

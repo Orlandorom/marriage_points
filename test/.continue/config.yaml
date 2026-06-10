@@ -1,0 +1,13 @@
+models:
+  - title: Gemma 4 E4B
+    provider: openai
+    model: gemma-4-e4b
+    apiBase: http://localhost:1234/v1
+    apiKey: lm-studio
+
+tabAutocompleteModel:
+  title: Gemma 4 E4B
+  provider: openai
+  model: gemma-4-e4b
+  apiBase: http://localhost:1234/v1
+  apiKey: lm-studio

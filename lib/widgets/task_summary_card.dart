@@ -8,7 +8,7 @@ class TaskSummaryCard extends StatelessWidget {
   const TaskSummaryCard({
     super.key, 
     required this.summary, 
-    required this.onCreatePressed
+    required this.onCreatePressed,
   });
 
   @override

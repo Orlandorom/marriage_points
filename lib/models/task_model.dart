@@ -2,31 +2,30 @@ class TaskModel {
   final String id;
   final String title;
   final String? description;
-  final int points;
-  final bool isCompleted;
   final String? createdByUserId;
-  final String? assignedToUserId;// Nuevo campo para diferenciar tareas normales de pedidos/deseos
+  final String? assignedToUserId;
+  final int status;
+  final int points;
 
   TaskModel({
     required this.id,
     required this.title,
     this.description,
-    required this.points,
-    required this.isCompleted,
-    required this.createdByUserId,
-    required this.assignedToUserId,
+    this.createdByUserId,
+    this.assignedToUserId,
+    this.status = 0,
+    this.points = 0,
   });
 
-  // Convierte JSON -> Objeto de Flutter
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
-      id: json['id'],
-      title: json['title'],
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
       description: json['description'],
-      points: json['points'],
-      isCompleted: json['isCompleted'] ?? false,
       createdByUserId: json['createdByUserId'],
       assignedToUserId: json['assignedToUserId'],
+      status: json['status'] ?? 0,
+      points: json['points'] ?? 0, // El deseo llega con 0, la pareja le dará valor
     );
   }
 }

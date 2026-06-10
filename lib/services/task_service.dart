@@ -48,25 +48,21 @@ class TaskService {
 Future<List<TaskModel>> getPartnerRequests() async {
   try {
     final options = await _getAuthOptions();
-    final response = await _dio.get("$_baseUrl/Tasks", options: options);
+    final response = await _dio.get(
+      "$_baseUrl/Tasks/received-requests", 
+      options: options,
+    );
 
     if (response.statusCode == 200) {
-      final List<dynamic> allTasks = response.data;
-      
-      // Suponiendo que tienes el ID del usuario actual guardado
-      // final myId = await _getMyId(); 
-
-      return allTasks
-          .map((item) => TaskModel.fromJson(item))
-          .where((task) => 
-              task.points == 0 && // Es un deseo
-              !task.isCompleted   // No está cumplido
-              // && task.createdByUserId != myId // Y no lo creé yo
-          )
-          .toList();
+      final List<dynamic> body = response.data; 
+      // Aquí es donde ocurría el fallo si el fromJson no era tolerante
+      return body.map((item) => TaskModel.fromJson(item)).toList();
     }
     return [];
-  } catch (e) {
+  } catch (e, stacktrace) {
+    // Te sugiero imprimir el stacktrace para cazar rápido estos errores de mapeo
+    print("Error parseando deseos: $e");
+    print(stacktrace);
     return [];
   }
 }
@@ -93,22 +89,32 @@ Future<List<TaskModel>> getPartnerRequests() async {
 // 2. Crear un nuevo deseo (Request)
   Future<bool> createGoalRequest(String title, DateTime targetDate) async {
   try {
-    final options = await _getAuthOptions();
+    // 1. Obtenemos las opciones que ya incluyen el Auth (JWT)
+    final options = await _getAuthOptions(); 
+    
+    // 2. Realizamos el POST al endpoint exacto que definiste
     final response = await _dio.post(
-      "$_baseUrl/Tasks/create-request", // Nuevo endpoint en C#
+      "$_baseUrl/Tasks/create-wish", // Endpoint según tu especificación
       data: {
-        "title": "PEDIDO: $title",
-        "description": "Solicitud de recompensa para el ${targetDate.toIso8601String()}",
-        "dueDate": targetDate.toIso8601String(),
-        "isRequest": true // Un flag para que tu pareja sepa que debe asignar tareas
+        "title": title,
+        "description": "Solicitud para el ${targetDate.day}/${targetDate.month}/${targetDate.year}",
+        // Si tu API usa otros nombres de campos, asegúrate de mapearlos aquí
       },
-      options: options,
+      options: options, // Aquí va el Bearer Token
     );
+
+    // 3. Verificamos éxito (200 OK o 201 Created)
     return response.statusCode == 200 || response.statusCode == 201;
+  } on DioException catch (e) {
+    // Manejo de errores específico de Dio
+    print("Error creando deseo: ${e.response?.statusCode} - ${e.response?.data}");
+    return false;
   } catch (e) {
+    print("Error inesperado: $e");
     return false;
   }
 }
+
 
   Future<Map<String, dynamic>> getCoupleStatus() async {
   try {
